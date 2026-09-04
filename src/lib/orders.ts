@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { findProduct } from "@/lib/data";
 
 export type OrderRow = {
   id: string;
@@ -126,7 +127,7 @@ export const orderStatusLabel = (s: string) =>
   })[s] ?? s;
 
 export const paymentStatusLabel = (s: string) =>
-  ({ pending: "Pay on Delivery", paid: "Paid", failed: "Failed" })[s] ?? s;
+  ({ pending: "Pay on Delivery", paid: "Paid", failed: "Failed", refunded: "Refunded" })[s] ?? s;
 
 
 export const formatDate = (iso: string) =>
