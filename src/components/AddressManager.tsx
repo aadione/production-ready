@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Loader2, MapPin, Pencil, Trash2, Plus, Check } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/lib/auth";
+import { useAuth, isValidPhone, normalizePhone } from "@/lib/auth";
 
 export type Address = {
   id: string;
@@ -132,7 +132,7 @@ export function AddressManager({
 
 
   const del = async (id: string) => {
-    const { error: err } = await supabase.from("addresses").delete().eq("id", id);
+    const { error: err } = await supabase.from("addresses").delete().eq("id", id).eq("user_id", user!.id);
     if (err) toast.error("Could not delete the address.");
     else {
       toast.success("Address removed");
@@ -141,7 +141,7 @@ export function AddressManager({
   };
 
   const makeDefault = async (id: string) => {
-    const { error: err } = await supabase.from("addresses").update({ is_default: true }).eq("id", id);
+    const { error: err } = await supabase.from("addresses").update({ is_default: true }).eq("id", id).eq("user_id", user!.id);
     if (err) toast.error("Could not set default address.");
     else await reload();
   };
