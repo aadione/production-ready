@@ -21,14 +21,38 @@ type SessionOut = {
   refresh_token: string;
 };
 
-function fail(message: string): never {
+function fail(message: string, cause?: unknown): never {
+  // The customer only ever sees `message`. The real cause is logged server-side
+  // so misconfiguration (e.g. a missing service-role key) is diagnosable.
+  if (cause !== undefined) console.error("[auth]", message, cause);
   throw new Error(message);
+}
+
+/**
+ * Guards against the server running with placeholder secrets, which would
+ * otherwise surface to customers as a generic "something went wrong".
+ */
+function assertServerConfigured() {
+  const missing: string[] = [];
+  const url = process.env["SUPABASE_URL"];
+  const service = process.env["SUPABASE_SERVICE_ROLE_KEY"];
+  const pepper = process.env["AUTH_PIN_SECRET"];
+  if (!url) missing.push("SUPABASE_URL");
+  if (!process.env["SUPABASE_PUBLISHABLE_KEY"]) missing.push("SUPABASE_PUBLISHABLE_KEY");
+  if (!pepper || pepper.length < 16) missing.push("AUTH_PIN_SECRET");
+  if (!service || !/^(sb_secret_|eyJ)/.test(service)) missing.push("SUPABASE_SERVICE_ROLE_KEY");
+  if (missing.length > 0) {
+    console.error(
+      `[auth] Server is not configured for accounts. Set these server environment variable(s): ${missing.join(", ")}`,
+    );
+    fail("Accounts are temporarily unavailable. Please try again shortly.");
+  }
 }
 
 /** Deterministic, high-entropy account password derived from phone + PIN + server pepper. */
 async function derivePassword(e164: string, pin: string) {
   const pepper = process.env["AUTH_PIN_SECRET"];
-  if (!pepper) fail("Something went wrong. Please try again.");
+  if (!pepper) fail("Accounts are temporarily unavailable. Please try again shortly.");
   const key = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(pepper),
@@ -91,6 +115,7 @@ async function mintSession(e164: string, pin: string, notFoundMessage: string): 
 export const loginWithPhonePin = createServerFn({ method: "POST" })
   .inputValidator((data: Input) => data)
   .handler(async ({ data }): Promise<SessionOut> => {
+    assertServerConfigured();
     const { e164, pin } = validate(data);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
@@ -99,7 +124,7 @@ export const loginWithPhonePin = createServerFn({ method: "POST" })
       .select("id")
       .eq("phone", e164)
       .maybeSingle();
-    if (error) fail("Something went wrong. Please try again.");
+    if (error) fail("Something went wrong. Please try again.", error);
     if (!profile) fail("Account not found. Please create an account.");
 
     return mintSession(e164, pin, "Incorrect phone number or PIN.");
@@ -108,6 +133,7 @@ export const loginWithPhonePin = createServerFn({ method: "POST" })
 export const signupWithPhonePin = createServerFn({ method: "POST" })
   .inputValidator((data: Input) => data)
   .handler(async ({ data }): Promise<SessionOut> => {
+    assertServerConfigured();
     const { e164, pin } = validate(data);
     const fullName = String(data.fullName ?? "").trim().slice(0, 80);
     if (fullName.length < 2) fail("Please enter your full name.");
@@ -119,7 +145,7 @@ export const signupWithPhonePin = createServerFn({ method: "POST" })
       .select("id")
       .eq("phone", e164)
       .maybeSingle();
-    if (lookupError) fail("Something went wrong. Please try again.");
+    if (lookupError) fail("Something went wrong. Please try again.", lookupError);
     if (existing) fail("This phone number is already registered. Please login instead.");
 
     const password = await derivePassword(e164, pin);
@@ -135,7 +161,7 @@ export const signupWithPhonePin = createServerFn({ method: "POST" })
       if (msg.includes("already") || msg.includes("registered") || msg.includes("exists")) {
         fail("This phone number is already registered. Please login instead.");
       }
-      fail("Something went wrong. Please try again.");
+      fail("Something went wrong. Please try again.", createError);
     }
 
     const userId = created.user.id;
