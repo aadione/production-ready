@@ -105,9 +105,17 @@ export async function placeOrder(input: NewOrderInput) {
   return data as string;
 }
 
+/**
+ * Image for an order line. The database snapshot stores names and prices, while
+ * artwork ships with the app bundle, so fall back to the local catalogue entry.
+ */
+export const orderItemImage = (item: { product_id: string; product_image?: string | null }) =>
+  item.product_image || findProduct(item.product_id)?.image || null;
 
 export const orderStatusLabel = (s: string) =>
   ({
+    placed: "Placed",
+
     pending: "Pending",
     confirmed: "Confirmed",
     processing: "Processing",
