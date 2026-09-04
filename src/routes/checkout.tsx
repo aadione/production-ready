@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { findProduct, inr } from "@/lib/data";
 import { useShop, deliveryFeeFor } from "@/lib/shop-store";
 import { useAuth } from "@/lib/auth";
+import { useCatalog } from "@/lib/catalog";
 import { AddressManager, useAddresses } from "@/components/AddressManager";
 import { placeOrder } from "@/lib/orders";
 import { BottomNav } from "@/components/BottomNav";
@@ -35,6 +36,7 @@ function CheckoutPage() {
   const { user, loading: authLoading } = useAuth();
   const { cartLines, clearCart } = useShop();
   const { addresses, loading: addrLoading } = useAddresses();
+  const { reload } = useCatalog();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [payment, setPayment] = useState<"cod">("cod");
   const [placing, setPlacing] = useState(false);

@@ -7,6 +7,7 @@ import { BottomNav } from "@/components/BottomNav";
 import {
   formatDate,
   getMyOrder,
+  orderItemImage,
   orderStatusLabel,
   paymentStatusLabel,
   type OrderItemRow,
@@ -95,10 +96,10 @@ function OrderDetailsPage() {
           <section className="card-surface mt-3 divide-y divide-border">
             {order.order_items.map((it) => (
               <div key={it.id} className="flex gap-2.5 p-2.5">
-                {it.product_image && (
+                {orderItemImage(it) && (
                   <div className="flex h-[58px] w-[58px] shrink-0 items-center justify-center rounded-lg bg-surface">
                     <img
-                      src={it.product_image}
+                      src={orderItemImage(it)!}
                       alt={it.product_name}
                       className="h-[46px] w-[46px] object-contain"
                     />

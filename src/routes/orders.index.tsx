@@ -7,6 +7,7 @@ import { BottomNav } from "@/components/BottomNav";
 import {
   formatDate,
   listMyOrders,
+  orderItemImage,
   orderStatusLabel,
   paymentStatusLabel,
   type OrderItemRow,
@@ -107,10 +108,10 @@ function MyOrdersPage() {
               <p className="mt-0.5 break-all text-[10.5px] text-subtle">#{o.id.slice(0, 8)}</p>
               <div className="mt-1.5 flex gap-2">
                 {o.order_items.slice(0, 3).map((it) =>
-                  it.product_image ? (
+                  orderItemImage(it) ? (
                     <img
                       key={it.id}
-                      src={it.product_image}
+                      src={orderItemImage(it)!}
                       alt={it.product_name}
                       className="h-10 w-10 rounded-lg bg-surface object-contain p-1"
                     />
