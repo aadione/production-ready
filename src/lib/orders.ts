@@ -63,56 +63,48 @@ export async function getMyOrder(orderId: string) {
 }
 
 export type NewOrderInput = {
-  userId: string;
-  shipping: ShippingSnapshot;
-  subtotal: number;
-  discount: number;
-  deliveryFee: number;
-  total: number;
-  paymentMethod: string;
-  items: Omit<OrderItemRow, "id">[];
+  addressId: string;
+  paymentMethod: "cod";
+  items: { product_id: string; quantity: number }[];
 };
 
-/** Creates the order + its item snapshots. Returns the new order id. */
-export async function placeOrder(input: NewOrderInput) {
-  const { data: order, error } = await supabase
-    .from("orders")
-    .insert({
-      user_id: input.userId,
-      shipping_address: input.shipping,
-      subtotal: input.subtotal,
-      discount: input.discount,
-      delivery_fee: input.deliveryFee,
-      total_amount: input.total,
-      payment_method: input.paymentMethod,
-      payment_status: "pending",
-      order_status: "confirmed",
-    })
-    .select("id")
-    .single();
-  if (error || !order) throw new Error("We could not place your order. Please try again.");
-
-  const { error: itemsError } = await supabase.from("order_items").insert(
-    input.items.map((it) => ({
-      order_id: order.id,
-      user_id: input.userId,
-      product_id: it.product_id,
-      product_name: it.product_name,
-      product_image: it.product_image,
-      product_brand: it.product_brand,
-      shop_name: it.shop_name,
-      price: it.price,
-      mrp: it.mrp,
-      quantity: it.quantity,
-      subtotal: it.subtotal,
-    })),
-  );
-  if (itemsError) {
-    await supabase.from("orders").delete().eq("id", order.id);
-    throw new Error("We could not save your order items. Please try again.");
+/** Maps a raw database error onto a sentence a customer can act on. */
+function friendlyOrderError(raw: string) {
+  const m = raw.toUpperCase();
+  if (m.includes("AUTH_REQUIRED")) return "Your session expired. Please log in again.";
+  if (m.includes("ADDRESS_INVALID")) return "Please select a valid delivery address.";
+  if (m.includes("CART_EMPTY")) return "There is nothing to order.";
+  if (m.includes("QUANTITY_INVALID")) return "Please check the quantities in your order.";
+  if (m.includes("PAYMENT_UNSUPPORTED")) return "Only Cash on Delivery is available right now.";
+  if (m.includes("OUT_OF_STOCK")) {
+    const name = raw.split("OUT_OF_STOCK:")[1]?.trim();
+    return name ? `“${name}” doesn't have enough stock left.` : "This product is out of stock.";
   }
-  return order.id as string;
+  if (m.includes("PRODUCT_UNAVAILABLE")) return "Some items are no longer available.";
+  return "We couldn't place your order. Please try again.";
 }
+
+/**
+ * Places the order through the atomic `public.place_order` database function.
+ *
+ * The browser only sends the address id and product ids + quantities. Prices,
+ * MRP, discount, delivery fee, the final total and stock checks are all read
+ * and calculated server-side inside a single transaction, so nothing about the
+ * money can be tampered with from the client. Returns the new order id.
+ */
+export async function placeOrder(input: NewOrderInput) {
+  const { data, error } = await supabase.rpc("place_order", {
+    p_address_id: input.addressId,
+    p_items: input.items as unknown as never,
+    p_payment_method: input.paymentMethod,
+  });
+  if (error || !data) {
+    console.error("place_order failed", error);
+    throw new Error(friendlyOrderError(error?.message ?? ""));
+  }
+  return data as string;
+}
+
 
 export const orderStatusLabel = (s: string) =>
   ({
