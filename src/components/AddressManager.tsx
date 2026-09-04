@@ -76,15 +76,52 @@ export function AddressManager({
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !form) return;
+    if (!user || !form || busy) return;
+
+    // Validate before touching the database so customers get a clear message
+    // instead of a raw constraint error.
+    if (form.full_name.trim().length < 2) {
+      toast.error("Please enter the full name for this address.");
+      return;
+    }
+    if (!isValidPhone(form.phone)) {
+      toast.error("Please enter a valid 10-digit mobile number.");
+      return;
+    }
+    if (form.line1.trim().length < 4) {
+      toast.error("Please enter the house / street address.");
+      return;
+    }
+    if (form.city.trim().length < 2 || form.state.trim().length < 2) {
+      toast.error("Please enter your city and state.");
+      return;
+    }
+    if (!/^[1-9]\d{5}$/.test(form.pincode.trim())) {
+      toast.error("Please enter a valid 6-digit pincode.");
+      return;
+    }
+
     setBusy(true);
-    const payload = { ...form, line2: form.line2 || null, user_id: user.id };
+    const payload = {
+      full_name: form.full_name.trim(),
+      phone: normalizePhone(form.phone),
+      line1: form.line1.trim(),
+      line2: form.line2.trim() || null,
+      city: form.city.trim(),
+      state: form.state.trim(),
+      pincode: form.pincode.trim(),
+      is_default: form.is_default,
+      user_id: user.id,
+    };
+    // RLS restricts both branches to rows owned by auth.uid(), so a tampered
+    // id or user_id from the client can never touch someone else's address.
     const res = editId
-      ? await supabase.from("addresses").update(payload).eq("id", editId)
+      ? await supabase.from("addresses").update(payload).eq("id", editId).eq("user_id", user.id)
       : await supabase.from("addresses").insert(payload);
     setBusy(false);
     if (res.error) {
-      toast.error("Could not save the address. Please check the fields.");
+      console.error("address save failed", res.error);
+      toast.error("Could not save the address. Please check the fields and try again.");
       return;
     }
     toast.success(editId ? "Address updated" : "Address added");
@@ -92,6 +129,7 @@ export function AddressManager({
     setEditId(null);
     await reload();
   };
+
 
   const del = async (id: string) => {
     const { error: err } = await supabase.from("addresses").delete().eq("id", id);
