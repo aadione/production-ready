@@ -52,52 +52,39 @@ function CheckoutPage() {
 
   const submit = async () => {
     if (placing) return;
-    if (!user) return;
+    if (!user) {
+      toast.error("Please log in to continue.");
+      return;
+    }
     if (lines.length === 0) {
       toast.error("There is nothing to order.");
       return;
     }
     if (!chosen) {
-      toast.error("Please add and select a delivery address.");
+      toast.error("Please select a delivery address.");
       return;
     }
     setPlacing(true);
     try {
+      // Only ids + quantities cross the wire. The database reads the real
+      // prices, MRP and stock and computes every total inside one transaction.
       const orderId = await placeOrder({
-        userId: user.id,
-        shipping: {
-          full_name: chosen.full_name,
-          phone: chosen.phone,
-          line1: chosen.line1,
-          line2: chosen.line2,
-          city: chosen.city,
-          state: chosen.state,
-          pincode: chosen.pincode,
-        },
-        subtotal,
-        discount,
-        deliveryFee: delivery,
-        total,
+        addressId: chosen.id,
         paymentMethod: payment,
-        items: lines.map((l) => ({
-          product_id: l.product.id,
-          product_name: l.product.name,
-          product_image: l.product.image,
-          product_brand: l.product.brand,
-          shop_name: l.product.store ?? l.product.brand,
-          price: l.product.price,
-          mrp: l.product.mrp,
-          quantity: l.qty,
-          subtotal: l.product.price * l.qty,
-        })),
+        items: lines.map((l) => ({ product_id: l.product.id, quantity: l.qty })),
       });
+      // place_order already removed the purchased rows server-side; mirror that
+      // in local state so the cart badge is correct immediately.
       await clearCart(lines.map((l) => l.product.id));
+      reload();
       navigate({ to: "/order-success/$orderId", params: { orderId }, replace: true });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not place your order.");
+      toast.error(err instanceof Error ? err.message : "We couldn't place your order. Please try again.");
+      reload();
       setPlacing(false);
     }
   };
+
 
   return (
     <div className="mx-auto max-w-[760px] pb-[120px] md:pb-10">
