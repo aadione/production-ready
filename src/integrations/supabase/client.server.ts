@@ -31,7 +31,10 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 
 function createSupabaseAdminClient() {
   const SUPABASE_URL = process.env['SUPABASE_URL'];
-  const SUPABASE_SERVICE_ROLE_KEY = process.env['SUPABASE_SERVICE_ROLE_KEY'];
+  // APP_SUPABASE_SERVICE_ROLE_KEY is the securely-stored secret for projects that
+  // bring their own Supabase project; SUPABASE_SERVICE_ROLE_KEY is the managed name.
+  const SUPABASE_SERVICE_ROLE_KEY =
+    process.env['APP_SUPABASE_SERVICE_ROLE_KEY'] || process.env['SUPABASE_SERVICE_ROLE_KEY'];
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     const missing = [

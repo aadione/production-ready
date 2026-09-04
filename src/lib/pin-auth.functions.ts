@@ -35,12 +35,13 @@ function fail(message: string, cause?: unknown): never {
 function assertServerConfigured() {
   const missing: string[] = [];
   const url = process.env["SUPABASE_URL"];
-  const service = process.env["SUPABASE_SERVICE_ROLE_KEY"];
+  const service =
+    process.env["APP_SUPABASE_SERVICE_ROLE_KEY"] || process.env["SUPABASE_SERVICE_ROLE_KEY"];
   const pepper = process.env["AUTH_PIN_SECRET"];
   if (!url) missing.push("SUPABASE_URL");
   if (!process.env["SUPABASE_PUBLISHABLE_KEY"]) missing.push("SUPABASE_PUBLISHABLE_KEY");
   if (!pepper || pepper.length < 16) missing.push("AUTH_PIN_SECRET");
-  if (!service || !/^(sb_secret_|eyJ)/.test(service)) missing.push("SUPABASE_SERVICE_ROLE_KEY");
+  if (!service || !/^(sb_secret_|eyJ)/.test(service)) missing.push("APP_SUPABASE_SERVICE_ROLE_KEY");
   if (missing.length > 0) {
     console.error(
       `[auth] Server is not configured for accounts. Set these server environment variable(s): ${missing.join(", ")}`,
