@@ -6,11 +6,15 @@
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
-// Vercel sets VERCEL=1 during builds. There we build a server-capable TanStack Start
-// app (Nitro's `vercel` preset → .vercel/output), so server functions and request
-// middleware keep running. Inside Lovable the sandbox picks its own target and this
-// value is ignored, so the preview keeps working unchanged.
-const isVercel = Boolean(process.env["VERCEL"]);
+// Vercel sets VERCEL=1 (and VERCEL_ENV) during builds. There we must build a
+// server-capable TanStack Start app (Nitro's `vercel` preset → .vercel/output with a
+// serverless function), otherwise the deploy would ship only static files and every
+// createServerFn() RPC (including phone + PIN login) would 404 at runtime.
+// Inside Lovable the sandbox forces its own preset and this value is ignored, so the
+// preview/publish flow keeps working unchanged.
+const explicitPreset = process.env["NITRO_PRESET"] || process.env["SERVER_PRESET"];
+const isVercel = Boolean(process.env["VERCEL"] || process.env["VERCEL_ENV"]);
+const preset = explicitPreset || (isVercel ? "vercel" : undefined);
 
 export default defineConfig({
   tanstackStart: {
@@ -18,5 +22,6 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
-  ...(isVercel ? { nitro: { preset: "vercel" } } : {}),
+  ...(preset ? { nitro: { preset } } : {}),
 });
+
